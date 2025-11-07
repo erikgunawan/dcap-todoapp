@@ -2,7 +2,11 @@ package id.erikgunawan.todoapp.data
 
 import android.content.Context
 import androidx.lifecycle.LiveData
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.liveData
+import id.erikgunawan.todoapp.utils.FilterUtils
 import id.erikgunawan.todoapp.utils.TasksFilterType
 
 class TaskRepository(private val tasksDao: TaskDao) {
@@ -29,14 +33,23 @@ class TaskRepository(private val tasksDao: TaskDao) {
     //TODO 4 : Use FilterUtils.getFilteredQuery to create filterable query
     //TODO 5 : Build PagingData with configuration
     fun getTasks(filter: TasksFilterType): LiveData<PagingData<Task>> {
-        throw NotImplementedError("Not yet implemented")
+        return Pager(
+            config = PagingConfig(
+                pageSize = PAGE_SIZE,
+                enablePlaceholders = PLACEHOLDERS
+            ),
+            pagingSourceFactory = {
+                val query = FilterUtils.getFilteredQuery(filter)
+                tasksDao.getTasks(query)
+            }
+        ).liveData
     }
 
     fun getTaskById(taskId: Int): LiveData<Task> {
         return tasksDao.getTaskById(taskId)
     }
 
-    fun getNearestActiveTask(): Task {
+    suspend fun getNearestActiveTask(): Task? {
         return tasksDao.getNearestActiveTask()
     }
 

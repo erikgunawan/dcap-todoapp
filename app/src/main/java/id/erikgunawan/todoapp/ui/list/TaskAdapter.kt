@@ -20,27 +20,30 @@ class TaskAdapter(
 
     //TODO 8 : Create and initialize ViewHolder
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TaskViewHolder {
-        throw NotImplementedError("Not yet implemented")
+        val view = android.view.LayoutInflater.from(parent.context)
+            .inflate(R.layout.task_item, parent, false)
+        return TaskViewHolder(view)
     }
 
     override fun onBindViewHolder(holder: TaskViewHolder, position: Int) {
-        val task = getItem(position) as Task
+        val task = getItem(position) ?: return
         //TODO 9 : Bind data to ViewHolder (You can run app to check)
+        //TODO 10 : Display title based on status using TitleTextView
         when {
-            //TODO 10 : Display title based on status using TitleTextView
             task.isCompleted -> {
                 //DONE
-                holder.cbComplete.isChecked = true
+                holder.tvTitle.state = TaskTitleView.DONE
             }
             task.dueDateMillis < System.currentTimeMillis() -> {
                 //OVERDUE
-                holder.cbComplete.isChecked = false
+                holder.tvTitle.state = TaskTitleView.OVERDUE
             }
             else -> {
                 //NORMAL
-                holder.cbComplete.isChecked = false
+                holder.tvTitle.state = TaskTitleView.NORMAL
             }
         }
+        holder.bind(task)
     }
 
     inner class TaskViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -54,13 +57,15 @@ class TaskAdapter(
             getTask = task
             tvTitle.text = task.title
             tvDueDate.text = DateConverter.convertMillisToString(task.dueDateMillis)
+            cbComplete.setOnCheckedChangeListener(null) // Remove listener to avoid triggering during binding
+            cbComplete.isChecked = task.isCompleted
+            cbComplete.setOnCheckedChangeListener { _, isChecked ->
+                onCheckedChange(task, isChecked)
+            }
             itemView.setOnClickListener {
                 val detailIntent = Intent(itemView.context, DetailTaskActivity::class.java)
                 detailIntent.putExtra(TASK_ID, task.id)
                 itemView.context.startActivity(detailIntent)
-            }
-            cbComplete.setOnClickListener {
-                onCheckedChange(task, !task.isCompleted)
             }
         }
 

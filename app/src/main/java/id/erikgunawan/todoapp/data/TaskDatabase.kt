@@ -1,9 +1,13 @@
 package id.erikgunawan.todoapp.data
 
 import android.content.Context
+import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import id.erikgunawan.todoapp.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -12,6 +16,7 @@ import java.io.IOException
 import java.io.InputStreamReader
 
 //TODO 3 : Define room database class and prepopulate database using JSON
+@Database(entities = [Task::class], version = 1, exportSchema = true)
 abstract class TaskDatabase : RoomDatabase() {
 
     abstract fun taskDao(): TaskDao
@@ -27,19 +32,37 @@ abstract class TaskDatabase : RoomDatabase() {
                     context.applicationContext,
                     TaskDatabase::class.java,
                     "task.db"
-                ).build()
+                )
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            super.onCreate(db)
+                            CoroutineScope(Dispatchers.IO).launch {
+                                fillWithStartingData(context, INSTANCE!!.taskDao())
+                            }
+                        }
+                    })
+                    .build()
                 INSTANCE = instance
+                // Prepopulate on first launch if database is empty
+                CoroutineScope(Dispatchers.IO).launch {
+                    val dao = instance.taskDao()
+                    val count = dao.getTasksCount()
+                    if (count == 0) {
+                        fillWithStartingData(context, dao)
+                    }
+                }
                 instance
             }
         }
 
-        private fun fillWithStartingData(context: Context, dao: TaskDao) {
+        private suspend fun fillWithStartingData(context: Context, dao: TaskDao) {
             val task = loadJsonArray(context)
             try {
                 if (task != null) {
+                    val tasks = mutableListOf<Task>()
                     for (i in 0 until task.length()) {
                         val item = task.getJSONObject(i)
-                        dao.insertAll(
+                        tasks.add(
                             Task(
                                 item.getInt("id"),
                                 item.getString("title"),
@@ -48,6 +71,9 @@ abstract class TaskDatabase : RoomDatabase() {
                                 item.getBoolean("completed")
                             )
                         )
+                    }
+                    if (tasks.isNotEmpty()) {
+                        dao.insertAll(*tasks.toTypedArray())
                     }
                 }
             } catch (exception: JSONException) {
@@ -70,6 +96,8 @@ abstract class TaskDatabase : RoomDatabase() {
                 exception.printStackTrace()
             } catch (exception: JSONException) {
                 exception.printStackTrace()
+            } finally {
+                reader.close()
             }
             return null
         }

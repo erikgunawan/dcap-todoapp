@@ -1,15 +1,22 @@
 package id.erikgunawan.todoapp.setting
 
 import android.Manifest
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreference
+import androidx.work.Data
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import id.erikgunawan.todoapp.R
+import id.erikgunawan.todoapp.notification.NotificationWorker
+import id.erikgunawan.todoapp.utils.NOTIFICATION_CHANNEL_ID
+import java.util.concurrent.TimeUnit
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -39,7 +46,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        if (Build.VERSION.SDK_INT > 32) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -52,6 +59,28 @@ class SettingsActivity : AppCompatActivity() {
             prefNotification?.setOnPreferenceChangeListener { preference, newValue ->
                 val channelName = getString(R.string.notify_channel_name)
                 //TODO 13 : Schedule and cancel daily reminder using WorkManager with data channelName
+                val workManager = WorkManager.getInstance(requireContext())
+                val workName = "daily_reminder"
+                
+                if (newValue as Boolean) {
+                    val inputData = Data.Builder()
+                        .putString(NOTIFICATION_CHANNEL_ID, channelName)
+                        .build()
+                    
+                    val periodicWorkRequest = PeriodicWorkRequestBuilder<NotificationWorker>(
+                        1, TimeUnit.DAYS
+                    )
+                        .setInputData(inputData)
+                        .build()
+                    
+                    workManager.enqueueUniquePeriodicWork(
+                        workName,
+                        ExistingPeriodicWorkPolicy.UPDATE,
+                        periodicWorkRequest
+                    )
+                } else {
+                    workManager.cancelUniqueWork(workName)
+                }
                 true
             }
 
